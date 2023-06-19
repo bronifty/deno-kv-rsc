@@ -29,7 +29,10 @@ async function handler(req) {
     }
   }
   if (slug === "/client.js") {
-    sendScript({ request: req, filename: "./client.js" });
+    const content = await sendScript({ request: req, filename: "./client.js" });
+    return new Response(content, {
+      headers: { "content-type": "application/javascript; charset=utf-8" },
+    });
   }
   try {
     if (url.searchParams.has("jsx")) {
@@ -54,15 +57,13 @@ async function handler(req) {
 serve(handler, { port: 8080 });
 
 async function sendScript({ request, filename }) {
-  // const content = await readFile(filename, "utf8");
-  // return new Response(content, {
-  //   headers: { "content-type": "application/javascript; charset=utf-8" },
+  const content = await readFile(filename, "utf8");
+  return content;
+  // return await fetch(filename, {
+  //   headers: request.headers,
+  //   method: request.method,
+  //   body: request.body,
   // });
-  return await fetch(filename, {
-    headers: request.headers,
-    method: request.method,
-    body: request.body,
-  });
 }
 
 async function sendJSX(jsx) {
