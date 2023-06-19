@@ -1,4 +1,4 @@
-import React from "react";
+import React from "https://esm.sh/react@18.2.0";
 // import { createServer } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
 import sanitizeFilename from "https://esm.sh/sanitize-filename@1.6.3";
