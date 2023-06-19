@@ -8,6 +8,7 @@ import { serve } from "https://deno.land/std@0.140.0/http/server.ts";
 import { addComment, getCommentsBySlug } from "./db2.js";
 import parseMultipartFormData from "../utils/form.js";
 import Router from "./components.js";
+
 async function handler(req) {
   const url = new URL(req.url);
   const slug = url.pathname;
@@ -21,73 +22,55 @@ async function handler(req) {
     let slug = parsedBody.slug;
     let comment = parsedBody.comment;
     try {
-      await addComment({
-        slug,
-        comment
-      });
+      await addComment({ slug, comment });
       return new Response("ok");
     } catch (error) {
       return new Response("error");
     }
   }
   if (slug === "/client.js") {
-    sendScript({
-      request: req,
-      filename: "./client.js"
-    });
+    sendScript({ filename: "./client.js" });
   }
   try {
     if (url.searchParams.has("jsx")) {
       url.searchParams.delete("jsx");
       // RSC (lives in window.__INITIAL_CLIENT_JSX_STRING__)
-      const clientJSXString = await sendJSX( /*#__PURE__*/React.createElement(Router, {
-        url: url
-      }));
+      const clientJSXString = await sendJSX(<Router url={url} />);
       return new Response(clientJSXString, {
-        headers: {
-          "content-type": "application/json; charset=utf-8"
-        }
+        headers: { "content-type": "application/json; charset=utf-8" },
       });
     } else {
       // SSR (1st load)
-      const html = await sendHTML( /*#__PURE__*/React.createElement(Router, {
-        url: url
-      }));
+      const html = await sendHTML(<Router url={url} />);
       return new Response(html, {
-        headers: {
-          "content-type": "text/html; charset=utf-8"
-        }
+        headers: { "content-type": "text/html; charset=utf-8" },
       });
     }
   } catch (err) {
     console.error(err);
-    return new Response(err.stack, {
-      status: 500
-    });
+    return new Response(err.stack, { status: 500 });
   }
 }
-serve(handler, {
-  port: 8080
-});
-async function sendScript({
-  request,
-  filename
-}) {
-  // const content = await readFile(filename, "utf8");
-  // return new Response(content, {
-  //   headers: { "content-type": "application/javascript; charset=utf-8" },
-  // });
-  return await fetch(filename, {
-    headers: request.headers,
-    method: request.method,
-    body: request.body
+serve(handler, { port: 8080 });
+
+async function sendScript({ filename }) {
+  const content = await readFile(filename, "utf8");
+  return new Response(content, {
+    headers: { "content-type": "application/javascript; charset=utf-8" },
   });
+  // return await fetch(filename, {
+  //   headers: request.headers,
+  //   method: request.method,
+  //   body: request.body,
+  // });
 }
+
 async function sendJSX(jsx) {
   const clientJSX = await renderJSXToClientJSX(jsx);
   const clientJSXString = JSON.stringify(clientJSX, stringifyJSX);
   return clientJSXString;
 }
+
 async function sendHTML(jsx) {
   const clientJSX = await renderJSXToClientJSX(jsx);
   let html = await ReactDOMServer.renderToString(clientJSX);
@@ -108,11 +91,17 @@ async function sendHTML(jsx) {
   `;
   return html;
 }
+
 async function renderJSXToClientJSX(jsx) {
-  if (typeof jsx === "string" || typeof jsx === "number" || typeof jsx === "boolean" || jsx == null) {
+  if (
+    typeof jsx === "string" ||
+    typeof jsx === "number" ||
+    typeof jsx === "boolean" ||
+    jsx == null
+  ) {
     return jsx;
   } else if (Array.isArray(jsx)) {
-    return Promise.all(jsx.map(child => renderJSXToClientJSX(child)));
+    return Promise.all(jsx.map((child) => renderJSXToClientJSX(child)));
   } else if (jsx != null && typeof jsx === "object") {
     if (jsx.$$typeof === Symbol.for("react.element")) {
       if (jsx.type === Symbol.for("react.fragment")) {
@@ -120,7 +109,7 @@ async function renderJSXToClientJSX(jsx) {
       } else if (typeof jsx.type === "string") {
         return {
           ...jsx,
-          props: await renderJSXToClientJSX(jsx.props)
+          props: await renderJSXToClientJSX(jsx.props),
         };
       } else if (typeof jsx.type === "function") {
         const Component = jsx.type;
@@ -133,13 +122,21 @@ async function renderJSXToClientJSX(jsx) {
         throw new Error("Not implemented.");
       }
     } else {
-      return Object.fromEntries(await Promise.all(Object.entries(jsx).map(async ([propName, value]) => [propName, await renderJSXToClientJSX(value)])));
+      return Object.fromEntries(
+        await Promise.all(
+          Object.entries(jsx).map(async ([propName, value]) => [
+            propName,
+            await renderJSXToClientJSX(value),
+          ])
+        )
+      );
     }
   } else {
     console.log("jsx fragment", jsx);
     throw new Error("Not implemented");
   }
 }
+
 function stringifyJSX(key, value) {
   if (value === Symbol.for("react.element")) {
     // We can't pass a symbol, so pass our magic string instead.
